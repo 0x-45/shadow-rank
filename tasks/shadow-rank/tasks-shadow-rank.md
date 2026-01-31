@@ -48,18 +48,15 @@ Update the file after completing each sub-task, not just after completing an ent
 
 ---
 
-## Tasks
+## Tasks [Ensure to check off each completed item]
 
-- [ ] 0.0 Create feature branch
-  - [ ] 0.1 Create and checkout a new branch for this feature (`git checkout -b feature/shadow-rank-mvp`)
-
-- [ ] 1.0 Project Setup & Configuration
-  - [ ] 1.1 Initialize Next.js 14+ project with App Router (`npx create-next-app@latest shadow-rank --typescript --tailwind --eslint --app --src-dir`)
-  - [ ] 1.2 Install dependencies: `@supabase/supabase-js`, `@supabase/ssr`, `canvas-confetti`, `lucide-react`
-  - [ ] 1.3 Create `.env.local` with placeholders for `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `REDUCTO_API_KEY`, `OPENAI_API_KEY` (or `GROQ_API_KEY`)
-  - [ ] 1.4 Configure `tailwind.config.ts` with custom dark theme colors (#0a0a0f background, #8b5cf6 purple accent) and glow animations
-  - [ ] 1.5 Set up basic folder structure: `src/components/ui`, `src/lib`, `src/types`
-  - [ ] 1.6 Create `src/types/index.ts` with TypeScript interfaces for `User`, `Quest`, `Skill`, `Challenge`, `AwakeningResult`
+- [x] 1.0 Project Setup & Configuration
+  - [x] 1.1 Initialize Next.js 14+ project with App Router (`npx create-next-app@latest shadow-rank --typescript --tailwind --eslint --app --src-dir`)
+  - [x] 1.2 Install dependencies: `@supabase/supabase-js`, `@supabase/ssr`, `canvas-confetti`, `lucide-react`
+  - [x] 1.3 Create `.env.local` with placeholders for `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `REDUCTO_API_KEY`, `OPENAI_API_KEY` (or `GROQ_API_KEY`)
+  - [x] 1.4 Configure `tailwind.config.ts` with custom dark theme colors (#0a0a0f background, #8b5cf6 purple accent) and glow animations
+  - [x] 1.5 Set up basic folder structure: `src/components/ui`, `src/lib`, `src/types`
+  - [x] 1.6 Create `src/types/index.ts` with TypeScript interfaces for `User`, `Quest`, `Skill`, `Challenge`, `AwakeningResult`
 
 - [ ] 2.0 Supabase Setup (Auth + Database)
   - [ ] 2.1 Create Supabase project and obtain URL + anon key

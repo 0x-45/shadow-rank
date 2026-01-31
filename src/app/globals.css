@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+:root {
+  /* Shadow Rank Dark Theme - Solo Leveling Inspired */
+  --background: #0a0a0f;
+  --foreground: #e5e5e5;
+  --purple-accent: #8b5cf6;
+  --purple-glow: #a78bfa;
+  --purple-dark: #6d28d9;
+  --card-bg: #151520;
+  --card-border: #2a2a3a;
+  --success: #22c55e;
+  --warning: #eab308;
+  --danger: #ef4444;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-purple-accent: var(--purple-accent);
+  --color-purple-glow: var(--purple-glow);
+  --color-purple-dark: var(--purple-dark);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Glow Animations */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px var(--purple-accent), 0 0 40px var(--purple-dark);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--purple-glow), 0 0 60px var(--purple-accent);
+  }
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 0 0 10px var(--purple-accent), 0 0 20px var(--purple-dark);
+  }
+  50% {
+    text-shadow: 0 0 20px var(--purple-glow), 0 0 40px var(--purple-accent);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes rank-up {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Utility Classes */
+.glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.text-glow {
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.rank-up-animation {
+  animation: rank-up 0.8s ease-out;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(139, 92, 246, 0.3),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--purple-dark);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--purple-accent);
+}
