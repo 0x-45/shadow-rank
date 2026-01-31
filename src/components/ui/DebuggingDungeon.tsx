@@ -1,7 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { X, Play, CheckCircle, XCircle, Lightbulb, Bug, Loader2 } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Play, CheckCircle, XCircle, Lightbulb, Bug, Loader2, Eye, RotateCcw } from 'lucide-react';
+import SlidePanel from './SlidePanel';
+import CodeEditor from './CodeEditor';
+import ConsoleOutput, { type ConsoleMessage } from './ConsoleOutput';
+import { runCode, verifyCodeOutput } from '@/lib/utils/codeRunner';
 import type { Challenge } from '@/types';
 
 interface DebuggingDungeonProps {
@@ -10,6 +14,7 @@ interface DebuggingDungeonProps {
   onComplete: (success: boolean, xpGained: number) => void;
   onClose: () => void;
   onNextChallenge: () => void;
+  isOpen: boolean;
 }
 
 export default function DebuggingDungeon({
@@ -18,80 +23,125 @@ export default function DebuggingDungeon({
   onComplete,
   onClose,
   onNextChallenge,
+  isOpen,
 }: DebuggingDungeonProps) {
   const [code, setCode] = useState(challenge.buggy_code);
-  const [output, setOutput] = useState<string | null>(null);
+  const [consoleOutput, setConsoleOutput] = useState<ConsoleMessage[]>([]);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [xpAwarded, setXpAwarded] = useState<number | null>(null);
 
-  const executeCode = useCallback(async (codeToRun: string): Promise<string> => {
-    // Wrap in async function to support await
-    const asyncWrapper = `
-      (async () => {
-        ${codeToRun}
-      })()
-    `;
-
-    try {
-      // Use Function constructor for safer execution than eval
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval
-      const fn = new Function(`return ${asyncWrapper}`);
-      const result = await fn();
-      return String(result);
-    } catch (error) {
-      if (error instanceof Error) {
-        return `Error: ${error.message}`;
-      }
-      return 'Error: Unknown error occurred';
-    }
-  }, []);
+  // Reset state when challenge changes
+  useEffect(() => {
+    setCode(challenge.buggy_code);
+    setConsoleOutput([]);
+    setIsCorrect(null);
+    setShowHint(false);
+    setShowSolution(false);
+    setXpAwarded(null);
+  }, [challenge]);
 
   const handleRun = async () => {
     setIsRunning(true);
-    setOutput(null);
     setIsCorrect(null);
 
     // Small delay for UX
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const result = await executeCode(code);
-    setOutput(result);
+    const result = runCode(code);
+    setConsoleOutput(result.output);
 
-    const correct = result.trim() === challenge.expected_output.trim();
+    // Check if output matches expected
+    const correct = verifyCodeOutput(code, challenge.expected_output);
     setIsCorrect(correct);
 
-    if (correct) {
-      onComplete(true, challenge.xp_reward);
+    setIsRunning(false);
+  };
+
+  const handleSubmit = async () => {
+    setIsRunning(true);
+
+    // Small delay for UX
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const result = runCode(code);
+    setConsoleOutput(result.output);
+
+    const correct = verifyCodeOutput(code, challenge.expected_output);
+    setIsCorrect(correct);
+
+    if (correct && !showSolution) {
+      // Award XP only if solution wasn't revealed
+      const xp = challenge.xp_reward;
+      setXpAwarded(xp);
+      onComplete(true, xp);
+    } else if (correct && showSolution) {
+      // No XP if solution was revealed
+      setXpAwarded(0);
+      onComplete(true, 0);
     }
 
     setIsRunning(false);
   };
 
+  const handleShowSolution = () => {
+    setShowSolution(true);
+    setShowHint(true); // Also show hint when revealing solution
+    
+    // Set a placeholder message that the solution is shown
+    setConsoleOutput([{
+      type: 'info',
+      content: 'Solution revealed. No XP will be awarded for this challenge.',
+      timestamp: Date.now(),
+    }]);
+  };
+
   const handleNextChallenge = () => {
     setCode(challenge.buggy_code);
-    setOutput(null);
+    setConsoleOutput([]);
     setIsCorrect(null);
     setShowHint(false);
+    setShowSolution(false);
+    setXpAwarded(null);
     onNextChallenge();
   };
 
+  const handleReset = () => {
+    setCode(challenge.buggy_code);
+    setConsoleOutput([]);
+    setIsCorrect(null);
+  };
+
+  const handleClose = () => {
+    setCode(challenge.buggy_code);
+    setConsoleOutput([]);
+    setIsCorrect(null);
+    setShowHint(false);
+    setShowSolution(false);
+    setXpAwarded(null);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-4xl max-h-[90vh] bg-card-bg border border-card-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-card-border">
+    <SlidePanel
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Debugging Dungeon"
+    >
+      <div className="flex flex-col h-full">
+        {/* Challenge Header */}
+        <div className="p-4 border-b border-card-border bg-background/50">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-purple-dark/30">
               <Bug className="w-5 h-5 text-purple-accent" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-foreground">
                 {challenge.title}
-              </h2>
+              </h3>
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500">Debugging Dungeon</span>
-                <span className="text-gray-600">•</span>
                 <span className="text-purple-accent">Level {skillLevel}</span>
                 <span className="text-gray-600">•</span>
                 <span className={`capitalize ${
@@ -100,15 +150,11 @@ export default function DebuggingDungeon({
                 }`}>
                   {challenge.difficulty}
                 </span>
+                <span className="text-gray-600">•</span>
+                <span className="text-muted">{challenge.xp_reward} XP</span>
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-background transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
         </div>
 
         {/* Content */}
@@ -116,27 +162,37 @@ export default function DebuggingDungeon({
           {/* Challenge Description */}
           <div className="p-4 rounded-xl bg-background border border-card-border">
             <p className="text-gray-300 leading-relaxed">{challenge.description}</p>
-            <div className="mt-2 text-sm text-gray-500">
-              Expected output: <code className="text-purple-accent">{challenge.expected_output}</code>
+            <div className="mt-3 p-2 rounded-lg bg-card-bg">
+              <span className="text-sm text-gray-500">Expected output: </span>
+              <code className="text-purple-accent font-mono">{challenge.expected_output}</code>
             </div>
           </div>
 
           {/* Code Editor */}
-          <div className="rounded-xl overflow-hidden border border-card-border">
-            <div className="flex items-center justify-between px-4 py-2 bg-background border-b border-card-border">
+          <div>
+            <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-400 font-mono">JavaScript</span>
-              <span className="text-xs text-gray-500">Fix the bug and run</span>
+              <button
+                onClick={handleReset}
+                className="text-xs text-muted hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Reset Code
+              </button>
             </div>
-            <textarea
+            <CodeEditor
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="w-full h-64 p-4 bg-[#0d0d12] text-gray-300 font-mono text-sm resize-none focus:outline-none"
-              spellCheck={false}
+              onChange={setCode}
+              height="280px"
+              placeholder="// Fix the buggy code..."
             />
           </div>
 
-          {/* Output */}
-          {output !== null && (
+          {/* Console Output */}
+          <ConsoleOutput messages={consoleOutput} maxHeight="180px" />
+
+          {/* Result Banner */}
+          {isCorrect !== null && (
             <div
               className={`p-4 rounded-xl border ${
                 isCorrect
@@ -144,36 +200,21 @@ export default function DebuggingDungeon({
                   : 'bg-red-900/20 border-red-800/50'
               }`}
             >
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2">
                 {isCorrect ? (
                   <CheckCircle className="w-5 h-5 text-green-400" />
                 ) : (
                   <XCircle className="w-5 h-5 text-red-400" />
                 )}
-                <span
-                  className={`font-medium ${
-                    isCorrect ? 'text-green-400' : 'text-red-400'
-                  }`}
-                >
-                  {isCorrect ? 'Correct! Challenge Complete!' : 'Incorrect Output'}
+                <span className={`font-medium ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                  {isCorrect ? 'Correct! Challenge Complete!' : 'Incorrect Output - Keep Trying!'}
                 </span>
-                {isCorrect && (
-                  <span className="ml-auto text-sm text-purple-accent">
-                    +{challenge.xp_reward} XP
+                {isCorrect && xpAwarded !== null && (
+                  <span className={`ml-auto text-sm ${xpAwarded > 0 ? 'text-purple-accent' : 'text-muted'}`}>
+                    {xpAwarded > 0 ? `+${xpAwarded} XP` : '0 XP (Solution revealed)'}
                   </span>
                 )}
               </div>
-              <div className="font-mono text-sm">
-                <span className="text-gray-500">Output: </span>
-                <span className={isCorrect ? 'text-green-300' : 'text-red-300'}>
-                  {output}
-                </span>
-              </div>
-              {!isCorrect && (
-                <div className="mt-2 font-mono text-sm text-gray-500">
-                  Expected: <span className="text-gray-400">{challenge.expected_output}</span>
-                </div>
-              )}
             </div>
           )}
 
@@ -187,47 +228,87 @@ export default function DebuggingDungeon({
               <p className="text-yellow-200/80 text-sm">{challenge.hint}</p>
             </div>
           )}
+
+          {/* Solution Revealed Warning */}
+          {showSolution && (
+            <div className="p-4 rounded-xl bg-orange-900/20 border border-orange-800/50">
+              <div className="flex items-center gap-2 mb-2">
+                <Eye className="w-5 h-5 text-orange-400" />
+                <span className="font-medium text-orange-400">Solution Mode</span>
+              </div>
+              <p className="text-orange-200/80 text-sm">
+                The solution hint is now visible. You can still complete this challenge, but no XP will be awarded. 
+                Use this as a learning opportunity!
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-card-border bg-background/50">
-          <button
-            onClick={() => setShowHint(!showHint)}
-            className="px-4 py-2 text-sm text-yellow-400 hover:bg-yellow-900/20 rounded-lg transition-colors flex items-center gap-2"
-          >
-            <Lightbulb className="w-4 h-4" />
-            {showHint ? 'Hide Hint' : 'Show Hint'}
-          </button>
-
-          <div className="flex items-center gap-3">
-            {isCorrect && (
+        <div className="p-4 border-t border-card-border bg-background/50">
+          <div className="flex items-center justify-between">
+            {/* Left side - Hint and Solution buttons */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleNextChallenge}
-                className="px-4 py-2 bg-purple-dark hover:bg-purple-accent text-white font-medium rounded-lg transition-colors"
+                onClick={() => setShowHint(!showHint)}
+                className="px-3 py-2 text-sm text-yellow-400 hover:bg-yellow-900/20 rounded-lg transition-colors flex items-center gap-2"
               >
-                Next Challenge
+                <Lightbulb className="w-4 h-4" />
+                {showHint ? 'Hide Hint' : 'Show Hint'}
               </button>
-            )}
-            <button
-              onClick={handleRun}
-              disabled={isRunning}
-              className="px-6 py-2 bg-purple-accent hover:bg-purple-glow text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {isRunning ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  Run & Verify
-                </>
+              
+              {!showSolution && !isCorrect && (
+                <button
+                  onClick={handleShowSolution}
+                  className="px-3 py-2 text-sm text-orange-400 hover:bg-orange-900/20 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Complete Solution (0 XP)
+                </button>
               )}
-            </button>
+            </div>
+
+            {/* Right side - Action buttons */}
+            <div className="flex items-center gap-3">
+              {isCorrect && (
+                <button
+                  onClick={handleNextChallenge}
+                  className="px-4 py-2 bg-purple-dark hover:bg-purple-accent text-white font-medium rounded-lg transition-colors"
+                >
+                  Next Challenge
+                </button>
+              )}
+              
+              <button
+                onClick={handleRun}
+                disabled={isRunning}
+                className="px-4 py-2 bg-card-bg hover:bg-card-border text-foreground font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 border border-card-border"
+              >
+                <Play className="w-4 h-4" />
+                Run Code
+              </button>
+              
+              <button
+                onClick={handleSubmit}
+                disabled={isRunning || isCorrect === true}
+                className="px-6 py-2 bg-purple-accent hover:bg-purple-glow text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Submit
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </SlidePanel>
   );
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { ResumeData } from '@/types';
+import { parseResumeData, parseResumeForSkills, mergeSkillsWithEarnedXp } from '@/lib/resume/parser';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
@@ -13,70 +15,74 @@ export async function POST(request: Request) {
       );
     }
 
-    if (file.type !== 'application/pdf') {
+    // Accept more file types
+    const allowedTypes = [
+      'application/pdf',
+      'text/plain',
+      'text/markdown',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Only PDF files are supported' },
+        { error: 'Supported file types: PDF, TXT, MD, DOC, DOCX' },
         { status: 400 }
       );
     }
 
-    // Check if Reducto API key is configured
-    const reductoApiKey = process.env.REDUCTO_API_KEY;
+    // Read file content
+    const fileContent = await file.text();
     
-    if (!reductoApiKey || reductoApiKey.includes('your_')) {
-      // Fallback: Extract basic info and return mock data
-      console.log('Reducto API key not configured, using mock parsing');
-      
-      const mockResumeData: ResumeData = {
-        source: 'resume',
-        raw_text: 'Resume uploaded but parsing not configured',
-        skills: ['JavaScript', 'TypeScript', 'React'],
-        experience: [],
-        projects: [],
-        education: [],
-        languages: ['JavaScript', 'TypeScript'],
-      };
+    // Parse resume data using our parser (currently returns placeholder)
+    const resumeData = parseResumeData(fileContent, 'resume');
+    const parsedSkills = parseResumeForSkills(fileContent, file.type);
 
-      return NextResponse.json({ resume_data: mockResumeData });
+    // Try to store skills in database if user is authenticated
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      // Get existing skills to preserve earned_xp
+      const { data: existingSkills } = await supabase
+        .from('skills')
+        .select('skill_name, earned_xp, base_level')
+        .eq('user_id', user.id);
+
+      // Merge new skills with existing earned XP
+      const mergedSkills = mergeSkillsWithEarnedXp(
+        parsedSkills,
+        existingSkills || []
+      );
+
+      // Upsert skills (update if exists, insert if not)
+      for (const skill of mergedSkills) {
+        await supabase
+          .from('skills')
+          .upsert({
+            user_id: user.id,
+            skill_name: skill.skill_name,
+            base_level: skill.base_level,
+            earned_xp: skill.earned_xp,
+            level: skill.level,
+          }, {
+            onConflict: 'user_id,skill_name',
+          });
+      }
+
+      // Update profile with resume data
+      await supabase
+        .from('profiles')
+        .update({
+          resume_data: resumeData,
+        })
+        .eq('id', user.id);
     }
 
-    // Call Reducto API for actual parsing
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
-
-    const reductoResponse = await fetch('https://api.reducto.ai/parse', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${reductoApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        document_url: `data:application/pdf;base64,${base64}`,
-        options: {
-          output_mode: 'markdown',
-        },
-      }),
+    return NextResponse.json({ 
+      resume_data: resumeData,
+      skills: parsedSkills,
     });
-
-    if (!reductoResponse.ok) {
-      console.error('Reducto API error:', await reductoResponse.text());
-      throw new Error('Resume parsing failed');
-    }
-
-    const reductoData = await reductoResponse.json();
-    
-    // Extract resume data from Reducto response
-    const resumeData: ResumeData = {
-      source: 'resume',
-      raw_text: reductoData.result?.text || '',
-      skills: extractSkills(reductoData.result?.text || ''),
-      experience: [],
-      projects: [],
-      education: [],
-      languages: extractLanguages(reductoData.result?.text || ''),
-    };
-
-    return NextResponse.json({ resume_data: resumeData });
 
   } catch (error) {
     console.error('Parse resume error:', error);
@@ -85,46 +91,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
-
-// Helper function to extract skills from resume text
-function extractSkills(text: string): string[] {
-  const skillKeywords = [
-    'JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Go', 'Rust',
-    'React', 'Vue', 'Angular', 'Node.js', 'Express', 'Next.js', 'Django', 'Flask',
-    'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'GraphQL', 'REST',
-    'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'CI/CD',
-    'Git', 'Linux', 'Agile', 'Scrum',
-    'Machine Learning', 'AI', 'Data Science', 'TensorFlow', 'PyTorch',
-  ];
-
-  const foundSkills: string[] = [];
-  const lowerText = text.toLowerCase();
-
-  for (const skill of skillKeywords) {
-    if (lowerText.includes(skill.toLowerCase())) {
-      foundSkills.push(skill);
-    }
-  }
-
-  return foundSkills;
-}
-
-// Helper function to extract programming languages
-function extractLanguages(text: string): string[] {
-  const languages = [
-    'JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Go', 'Rust',
-    'Ruby', 'PHP', 'Swift', 'Kotlin', 'Scala', 'R', 'MATLAB',
-  ];
-
-  const foundLanguages: string[] = [];
-  const lowerText = text.toLowerCase();
-
-  for (const lang of languages) {
-    if (lowerText.includes(lang.toLowerCase())) {
-      foundLanguages.push(lang);
-    }
-  }
-
-  return foundLanguages;
 }

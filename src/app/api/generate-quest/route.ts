@@ -5,6 +5,10 @@ import {
   generateNextQuestPrompt,
   parseAIResponse,
 } from '@/lib/ai/prompts';
+import {
+  generateQuestsWithLangChain,
+  getFallbackQuests,
+} from '@/lib/ai/langchain';
 import type { Rank, Quest, SkillGap } from '@/types';
 
 export async function POST(request: Request) {
@@ -28,6 +32,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
 
+    // Get user skills for LangChain generation
+    const { data: skills } = await supabase
+      .from('skills')
+      .select('skill_name, level')
+      .eq('user_id', user.id);
+
     // Get quest history
     const { data: questHistory } = await supabase
       .from('quest_history')
@@ -36,26 +46,44 @@ export async function POST(request: Request) {
 
     const completedQuests = questHistory?.map(q => q.quest_title) || [];
 
-    // Generate next quest using AI or fallback
+    // Generate next quest using LangChain, legacy API, or fallback
     let nextQuest: Quest;
     
     const openaiKey = process.env.OPENAI_API_KEY;
     const groqKey = process.env.GROQ_API_KEY;
 
+    // Try LangChain with OpenAI first
     if (openaiKey && !openaiKey.includes('your_')) {
-      nextQuest = await generateQuestWithOpenAI(
-        profile.rank,
-        completedQuests,
-        openaiKey
-      );
+      try {
+        const quests = await generateQuestsWithLangChain({
+          skills: skills || [],
+          goal: profile.goal || null,
+          rank: profile.rank,
+          xp: profile.xp,
+          numQuests: 1,
+          apiKey: openaiKey,
+        });
+        nextQuest = quests[0];
+      } catch (langchainError) {
+        console.error('LangChain generation failed, trying legacy API:', langchainError);
+        // Fall back to legacy OpenAI implementation
+        nextQuest = await generateQuestWithOpenAI(
+          profile.rank,
+          completedQuests,
+          openaiKey
+        );
+      }
     } else if (groqKey && !groqKey.includes('your_')) {
+      // Use Groq as fallback (legacy implementation)
       nextQuest = await generateQuestWithGroq(
         profile.rank,
         completedQuests,
         groqKey
       );
     } else {
-      nextQuest = getFallbackQuest(profile.rank);
+      // Use static fallback quests
+      const fallbackQuests = getFallbackQuests(profile.rank);
+      nextQuest = fallbackQuests[0];
     }
 
     // Update profile with new quest
@@ -104,7 +132,7 @@ async function generateQuestWithOpenAI(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: AWAKENING_SYSTEM_PROMPT },
           { role: 'user', content: generateNextQuestPrompt(rank, completedQuests, gaps) },
@@ -129,7 +157,7 @@ async function generateQuestWithOpenAI(
     throw new Error('Failed to parse quest');
   } catch (error) {
     console.error('OpenAI quest generation error:', error);
-    return getFallbackQuest(rank);
+    return getStaticFallbackQuest(rank);
   }
 }
 
@@ -175,11 +203,11 @@ async function generateQuestWithGroq(
     throw new Error('Failed to parse quest');
   } catch (error) {
     console.error('Groq quest generation error:', error);
-    return getFallbackQuest(rank);
+    return getStaticFallbackQuest(rank);
   }
 }
 
-function getFallbackQuest(rank: Rank): Quest {
+function getStaticFallbackQuest(rank: Rank): Quest {
   const quests: Record<Rank, Quest> = {
     E: {
       id: `quest-e-${Date.now()}`,

@@ -7,6 +7,15 @@
 export type Rank = 'E' | 'D' | 'C' | 'B' | 'A';
 
 /**
+ * User's career goal
+ */
+export interface Goal {
+  text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * User profile stored in Supabase
  */
 export interface User {
@@ -18,6 +27,9 @@ export interface User {
   xp: number;
   current_quest: Quest | null;
   resume_data: ResumeData | null;
+  goal: string | null; // User's career goal
+  resume_url: string | null; // URL to uploaded resume in Supabase storage
+  resume_uploaded_at: string | null; // When resume was last uploaded
   created_at: string;
   updated_at: string;
 }
@@ -77,10 +89,24 @@ export interface Skill {
   id: string;
   user_id: string;
   skill_name: string;
-  level: number; // 1-10
-  xp: number;
+  level: number; // 1-10, calculated as max(base_level, base_level + earned_xp_level)
+  base_level: number; // 1-10, derived from resume parsing
+  xp: number; // Legacy field for compatibility
+  earned_xp: number; // XP earned from activities (debugging challenges, etc.)
   unlocked: boolean;
   icon?: string;
+}
+
+/**
+ * Skill data for radar chart display
+ */
+export interface SkillRadarData {
+  skill_name: string;
+  level: number;
+  base_level: number;
+  earned_xp: number;
+  is_levelable: boolean; // Can earn XP through activities (e.g., Debugging)
+  full_mark: number; // Max value (10 for skills)
 }
 
 /**
@@ -91,7 +117,23 @@ export type SkillName =
   | 'System Design'
   | 'Frontend'
   | 'Backend'
-  | 'DevOps';
+  | 'DevOps'
+  | 'Testing'
+  | 'Database';
+
+/**
+ * Skills that can be leveled up through activities
+ */
+export const LEVELABLE_SKILLS: SkillName[] = ['Debugging'];
+
+/**
+ * Parsed skill from resume with proficiency level
+ */
+export interface ParsedSkill {
+  name: SkillName;
+  level: number; // 1-10
+  confidence: number; // 0-1, how confident we are in this assessment
+}
 
 /**
  * Debugging challenge for the dungeon

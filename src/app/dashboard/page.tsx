@@ -10,10 +10,11 @@ import { createClient } from '@/lib/supabase/client';
 import RankBadge from '@/components/ui/RankBadge';
 import XPProgressBar from '@/components/ui/XPProgressBar';
 import QuestCard from '@/components/ui/QuestCard';
-import SkillTree from '@/components/ui/SkillTree';
 import DebuggingDungeon from '@/components/ui/DebuggingDungeon';
 import ResumeUpload from '@/components/ui/ResumeUpload';
 import RankUpAnimation from '@/components/ui/RankUpAnimation';
+import SkillRadarChart from '@/components/ui/SkillRadarChart';
+import GoalInput from '@/components/ui/GoalInput';
 import { getRandomChallenge } from '@/lib/challenges/debugging';
 import type { User, Skill, Challenge, Rank, SkillName } from '@/types';
 
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const [completedChallenges, setCompletedChallenges] = useState<string[]>([]);
   const [showRankUp, setShowRankUp] = useState(false);
   const [newRank, setNewRank] = useState<Rank | null>(null);
+  const [showSkillChart, setShowSkillChart] = useState(false);
   
   const router = useRouter();
   const supabase = createClient();
@@ -132,6 +134,9 @@ export default function DashboardPage() {
             difficulty: 'easy',
           },
           resume_data: null,
+          goal: null,
+          resume_url: null,
+          resume_uploaded_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -141,7 +146,9 @@ export default function DashboardPage() {
           user_id: 'dev-user-123',
           skill_name: 'Debugging',
           level: 1,
+          base_level: 1,
           xp: 0,
+          earned_xp: 0,
           unlocked: true,
         }];
 
@@ -225,6 +232,9 @@ export default function DashboardPage() {
             difficulty: 'medium',
           },
           resume_data: null,
+          goal: null,
+          resume_url: null,
+          resume_uploaded_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -234,7 +244,9 @@ export default function DashboardPage() {
           user_id: 'dev-user-123',
           skill_name: 'Debugging',
           level: 1,
+          base_level: 1,
           xp: 0,
+          earned_xp: 0,
           unlocked: true,
         }];
 
@@ -432,6 +444,29 @@ export default function DashboardPage() {
     setState('dashboard');
   };
 
+  // Handle skill click from radar chart
+  const handleRadarSkillClick = (skillName: SkillName) => {
+    if (skillName === 'Debugging') {
+      const challenge = getRandomChallenge(completedChallenges);
+      setCurrentChallenge(challenge);
+      setShowDungeon(true);
+    }
+  };
+
+  // Handle goal save
+  const handleGoalSave = (newGoal: string) => {
+    if (user) {
+      setUser({ ...user, goal: newGoal });
+    }
+  };
+
+  // Handle goal delete
+  const handleGoalDelete = () => {
+    if (user) {
+      setUser({ ...user, goal: null });
+    }
+  };
+
   // Render based on state
   if (state === 'loading') {
     return (
@@ -526,24 +561,80 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Goal Section */}
+            <GoalInput 
+              currentGoal={user.goal} 
+              onGoalSave={handleGoalSave}
+              onGoalDelete={handleGoalDelete}
+            />
+
             {/* Quest Section */}
             <QuestCard
               quest={user.current_quest}
               onSubmit={handleQuestSubmit}
             />
 
-            {/* Skill Tree Section */}
-            <SkillTree
-              skills={skills}
-              onSkillClick={handleSkillClick}
-            />
+            {/* Skills Section with Radar Chart */}
+            <div className="bg-card-bg border border-card-border rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-foreground">Your Skills</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Click on Debugging to enter the dungeon and level up
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowSkillChart(!showSkillChart)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                  {showSkillChart ? 'Hide Chart' : 'Level Up Skills'}
+                </button>
+              </div>
+              
+              {showSkillChart && (
+                <div className="mt-4 p-4 bg-gray-900/50 rounded-xl">
+                  <SkillRadarChart 
+                    skills={skills}
+                    onSkillClick={handleRadarSkillClick}
+                  />
+                </div>
+              )}
+              
+              {!showSkillChart && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {skills.map(skill => (
+                    <button
+                      key={skill.id}
+                      onClick={() => handleSkillClick(skill.skill_name as SkillName)}
+                      className={`p-4 rounded-lg border transition-all ${
+                        skill.skill_name === 'Debugging' 
+                          ? 'bg-purple-600/20 border-purple-500/50 hover:border-purple-400 cursor-pointer' 
+                          : 'bg-gray-800/50 border-gray-700 cursor-default'
+                      }`}
+                    >
+                      <div className="text-sm font-medium text-gray-300">{skill.skill_name}</div>
+                      <div className="text-2xl font-bold text-white mt-1">
+                        {skill.level}<span className="text-sm text-gray-500">/10</span>
+                      </div>
+                      {skill.skill_name === 'Debugging' && (
+                        <div className="text-xs text-purple-400 mt-2">Click to train</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
 
-      {/* Debugging Dungeon Modal */}
-      {showDungeon && currentChallenge && (
+      {/* Debugging Dungeon Slide Panel */}
+      {currentChallenge && (
         <DebuggingDungeon
+          isOpen={showDungeon}
           challenge={currentChallenge}
           skillLevel={skills.find((s) => s.skill_name === 'Debugging')?.level || 1}
           onComplete={handleChallengeComplete}

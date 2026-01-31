@@ -1,6 +1,12 @@
 'use client';
 
-import { Bug, TestTube, Layers, Code, Cloud, Lock } from 'lucide-react';
+/**
+ * @deprecated This component is deprecated in favor of SkillRadarChart.
+ * Use SkillRadarChart for the new radar/spider chart visualization of skills.
+ * This file is kept for backwards compatibility but will be removed in a future version.
+ */
+
+import { Bug, TestTube, Layers, Code, Cloud, Lock, Database, FlaskConical } from 'lucide-react';
 import { SkillProgressBar } from './XPProgressBar';
 import type { Skill, SkillName } from '@/types';
 
@@ -38,9 +44,19 @@ const SKILL_CONFIG: Record<
     description: 'Deploy and maintain infrastructure',
     color: 'text-red-400',
   },
+  Testing: {
+    icon: FlaskConical,
+    description: 'Ensure code quality with comprehensive tests',
+    color: 'text-purple-400',
+  },
+  Database: {
+    icon: Database,
+    description: 'Design and optimize data storage solutions',
+    color: 'text-yellow-400',
+  },
 };
 
-const ALL_SKILLS: SkillName[] = ['Debugging', 'System Design', 'Frontend', 'Backend', 'DevOps'];
+const ALL_SKILLS: SkillName[] = ['Debugging', 'System Design', 'Frontend', 'Backend', 'DevOps', 'Testing', 'Database'];
 
 export default function SkillTree({ skills, onSkillClick }: SkillTreeProps) {
   const skillMap = new Map(skills.map((s) => [s.skill_name, s]));
